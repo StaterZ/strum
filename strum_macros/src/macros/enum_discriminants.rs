@@ -200,6 +200,41 @@ pub fn enum_discriminants_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
             }
         }
     };
+    
+    let impl_try_from = {
+        let arms = variants
+            .iter()
+            .map(|variant| {
+                let ident = &variant.ident;
+                let output = match &variant.fields {
+                    Fields::Unit => quote! { Ok( #name::#ident ) },
+                    Fields::Unnamed(_fields) => quote! { Err(()) },
+                    Fields::Named(_fields) => quote! { Err(()) },
+                };
+
+                quote! { #discriminants_name::#ident => #output }
+            })
+            .collect::<Vec<_>>();
+
+        let try_from_fn_body = if variants.is_empty() {
+            //this method on empty enum is impossible to be called. it is therefor left empty
+            quote! { unreachable!()}
+        } else {
+            quote! { match val { #(#arms),* } }
+        };
+        
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics ::core::convert::TryFrom< #discriminants_name > for #name #ty_generics #where_clause {
+                type Error = ();
+
+                #[inline]
+                fn try_from(val: #discriminants_name) -> Result<#name #ty_generics, Self::Error> {
+                    #try_from_fn_body
+                }
+            }
+        }
+    };
 
     // For now, only implement IntoDiscriminant if the user has not overriden the visibility.
     let impl_into_discriminant = match type_properties.discriminant_vis {
@@ -233,5 +268,6 @@ pub fn enum_discriminants_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
         #impl_into_discriminant
         #impl_from
         #impl_from_ref
+        #impl_try_from
     })
 }
