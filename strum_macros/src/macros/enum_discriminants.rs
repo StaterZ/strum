@@ -217,7 +217,7 @@ pub fn enum_discriminants_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
             .collect::<Vec<_>>();
 
         let try_from_fn_body = if variants.is_empty() {
-            //this method on empty enum is impossible to be called. it is therefor left empty
+            //this method on empty enum is impossible to be called. it is therefore left empty
             quote! { unreachable!()}
         } else {
             quote! { match val { #(#arms),* } }
@@ -232,6 +232,16 @@ pub fn enum_discriminants_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
                 fn try_from(val: #discriminants_name) -> Result<#name #ty_generics, Self::Error> {
                     #try_from_fn_body
                 }
+            }
+        }
+    };
+
+    let impl_partial_eq = quote! {
+        #[automatically_derived]
+        impl #impl_generics ::std::cmp::PartialEq< #discriminants_name > for #name #ty_generics #where_clause {
+            #[inline]
+            fn eq(&self, other: & #discriminants_name) -> bool {
+                <Self as #strum_module_path::IntoDiscriminant>::discriminant(&self) == *other
             }
         }
     };
@@ -269,5 +279,6 @@ pub fn enum_discriminants_inner(ast: &DeriveInput) -> syn::Result<TokenStream> {
         #impl_from
         #impl_from_ref
         #impl_try_from
+        #impl_partial_eq
     })
 }
